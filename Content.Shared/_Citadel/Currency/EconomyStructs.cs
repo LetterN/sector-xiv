@@ -1,54 +1,8 @@
-using Robust.Shared.Utility;
-
 namespace Content.Shared._Citadel.Currency;
 
 /// <summary>
-/// This is where you register currency types. Shared both client & server
+/// A type of currency.
 /// </summary>
-public abstract class SharedEconomySystem : CitadelSystem
-{
-    private readonly Dictionary<int, CurrencyType> _currencyTypes = new();
-
-    public override void Initialize()
-    {
-        _currencyTypes.Add(CurrencyType.CitadelStationCurrency.GetHashCode(), CurrencyType.CitadelStationCurrency);
-        _currencyTypes.Add(CurrencyType.TestStationCurrency.GetHashCode(), CurrencyType.SyndicateCurrency);
-        _currencyTypes.Add(CurrencyType.TestStationCurrency.GetHashCode(), CurrencyType.TestStationCurrency);
-        base.Initialize();
-    }
-
-    public void RegisterCurrency(string name, string shortname, char symbol)
-    {
-        var ct = new CurrencyType(name, shortname, symbol);
-        if (_currencyTypes.ContainsKey(ct.GetHashCode()))
-        {
-            return;
-        }
-        _currencyTypes.Add(ct.GetHashCode(), ct);
-    }
-
-    public CurrencyType? GetCurrencyByName(string name)
-    {
-        if (_currencyTypes.TryGetValue(name.GetHashCode(), out var ct))
-        {
-            return ct;
-        }
-        return null;
-    }
-
-    public CurrencyType? GetCurrencyByShortname(string shortname)
-    {
-        foreach (var ct in _currencyTypes.Values)
-        {
-            if (ct.Shortname == shortname)
-            {
-                return ct;
-            }
-        }
-        return null;
-    }
-}
-
 [DataRecord]
 public readonly partial struct CurrencyType : IEquatable<CurrencyType>
 {
@@ -75,7 +29,7 @@ public readonly partial struct CurrencyType : IEquatable<CurrencyType>
     /// Char/symbol of the currency, ie `$`
     /// </summary>
     [DataField]
-    public readonly char Symbol;
+    public readonly char Symbol; // should this be really a symbol or an icon *shrug
 
     // public readonly string Format; // like 0.00{sym} or {sym}00.00 idk
 
@@ -110,7 +64,9 @@ public readonly partial struct BankAccount : IEquatable<BankAccount>
     public static BankAccount SyndicateAccount = new("Donk Co. Account C", adminbuse: true);
 
     // maybe account id for uniqueness?
+    [DataField]
     public readonly string Name;
+    [DataField]
     public readonly string Password;
 
     /// TODO: flag this OR split enum it: ADMIN_ACCOUNT | (STATION_ACCOUNT | PLAYER_ACCOUNT | COMPANY_ACCOUNT)
@@ -121,6 +77,7 @@ public readonly partial struct BankAccount : IEquatable<BankAccount>
     /// id = CurrencyType hash, value = count
     /// </summary>
     public readonly Dictionary<int, float> AccountBalance;
+
     public readonly List<BankRecord> BankRecords;
 
     public BankAccount(string name, string password = "", bool adminbuse = false)
@@ -139,13 +96,15 @@ public readonly partial struct BankAccount : IEquatable<BankAccount>
             // too poor
             return false;
         }
-        from.AddCurrency(currency, -value, "Transfer to "+to.Name+" Note:"+note);
-        from.AddCurrency(currency, value, "Transfer from "+from.Name+" Note:"+note);
+
+        from.AddCurrency(currency, -value, "Transfer to " + to.Name + " Note:" + note);
+        from.AddCurrency(currency, value, "Transfer from " + from.Name + " Note:" + note);
         return true;
     }
 
     /// <summary>
     /// Add currency. You can also remove currency by setting the value to negatives.
+    /// This one handles "logging" of currency transfer (BankRecords)
     /// </summary>
     /// <param name="currency">hash of the currency</param>
     /// <param name="value"></param>
@@ -172,6 +131,10 @@ public readonly partial struct BankAccount : IEquatable<BankAccount>
     }
 }
 
+/// <summary>
+/// A record of transactional events on an account
+/// </summary>
+[DataRecord]
 public readonly partial struct BankRecord(int currencyType, float currencyAmount = 0f, string note = "")
 {
     /// <summary>
