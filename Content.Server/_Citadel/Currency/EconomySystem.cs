@@ -1,12 +1,16 @@
+using Content.Server.Stack;
 using Content.Shared._Citadel.Currency;
+using Content.Shared._Citadel.Currency.Components;
 
 namespace Content.Server._Citadel.Currency;
 
 /// <summary>
 /// Server part of the economy, handles bank accounts (private)
 /// </summary>
-public sealed class EconomySystem : SharedEconomySystem
+public sealed partial class EconomySystem : SharedEconomySystem
 {
+    [Dependency] private StackSystem _stack = default!;
+
     private readonly List<BankAccount> _bankAccounts = new();
 
     public override void Initialize()
@@ -22,9 +26,11 @@ public sealed class EconomySystem : SharedEconomySystem
         base.Initialize();
     }
 
-    public void CreateBankAccount(string name, string password)
+    public BankAccount CreateBankAccount(string name, string password, bool adminbuse = false)
     {
-        _bankAccounts.Add(new BankAccount(name, password));
+        var bac = new BankAccount(name, password, adminbuse);
+        _bankAccounts.Add(bac);
+        return bac;
     }
 
     /// <summary>
@@ -42,7 +48,35 @@ public sealed class EconomySystem : SharedEconomySystem
                 return bankAccount;
             }
         }
-
         return null;
+    }
+
+    /// <param name="atmRef">atm entity ref</param>
+    /// <param name="currType">currency type hash</param>
+    /// <param name="amount">Value to be withrawn, will be set negative!</param>
+    /// <param name="name">account name</param>
+    /// <param name="password">this is validated before being sent down here from the UI, only admins can null this</param>
+    /// <param name="note"></param>
+    public void WithrawFromAccount(
+        EntityUid atmRef,
+        int currType,
+        float amount,
+        string name,
+        string? password,
+        string note = "ATM #{MACHINE_ID} Withdrawal")
+    {
+        var account = GetBankAccount(name, password);
+        if (!account.HasValue)
+            return;
+        amount = Math.Abs(amount);
+        if (!account.Value.AddCurrency(currType, -amount, note))
+            return;
+
+        var money = SpawnAtPosition("money", Transform(atmRef).Coordinates);
+        if (!TryComp<MoneyComponent>(money, out var moneyCmp))
+            return;
+        moneyCmp.CurrencyType = currType;
+        moneyCmp.Amount = amount;
+        _stack.TryMergeToContacts(money);
     }
 }

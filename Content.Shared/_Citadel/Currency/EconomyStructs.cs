@@ -91,13 +91,10 @@ public readonly partial struct BankAccount : IEquatable<BankAccount>
 
     public static bool TransferCurrency(BankAccount from, BankAccount to, int currency, float value, string? note)
     {
-        if (from.AccountBalance[currency] < value)
+        if (!from.AddCurrency(currency, -value, "Transfer to " + to.Name + " Note:" + note))
         {
-            // too poor
             return false;
         }
-
-        from.AddCurrency(currency, -value, "Transfer to " + to.Name + " Note:" + note);
         from.AddCurrency(currency, value, "Transfer from " + from.Name + " Note:" + note);
         return true;
     }
@@ -109,10 +106,17 @@ public readonly partial struct BankAccount : IEquatable<BankAccount>
     /// <param name="currency">hash of the currency</param>
     /// <param name="value"></param>
     /// <param name="note"></param>
-    public void AddCurrency(int currency, float value, string note = "")
+    public bool AddCurrency(int currency, float value, string note = "")
     {
+        if (value < 0 && AccountBalance[currency] < Math.Abs(value))
+        {
+            // too poor
+            return false;
+        }
+
         AccountBalance[currency] += value;
         BankRecords.Add(new BankRecord(currency, value, note));
+        return true;
     }
 
     public bool Equals(BankAccount other)
