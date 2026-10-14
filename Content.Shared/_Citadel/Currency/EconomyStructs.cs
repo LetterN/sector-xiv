@@ -59,20 +59,51 @@ public readonly partial struct CurrencyType : IEquatable<CurrencyType>
 [DataRecord]
 public readonly partial struct BankAccount : IEquatable<BankAccount>
 {
-    public static BankAccount StationBankAccount = new("Citadel Station Accounting", adminbuse: true);
-    public static BankAccount TerraGovAccount = new("TerraGov Finances", adminbuse: true);
-    public static BankAccount SyndicateAccount = new("Donk Co. Account C", adminbuse: true);
+    public enum BankAccountType
+    {
+        /// <summary>
+        /// Magic account for arbitrage mechanics etc... not the wizard federation account. Admin only
+        /// </summary>
+        MagicAccount = 0,
+        /// <summary>
+        /// Account owned by a station entity. Admin only for now
+        /// </summary>
+        StationAccount = 1,
+        /// <summary>
+        /// Account owned by a player **character**
+        /// </summary>
+        PlayerAccount = 2,
+        /// <summary>
+        /// Account owned by a company entity
+        /// </summary>
+        CompanyAccount = 3,
+        /// <summary>
+        /// Account owned by a faction. Admin only
+        /// </summary>
+        FactionAccount = 4,
+    }
+    /// <summary>
+    /// Unique account id. The value of this will be the hashmap AND the comparator for equality.
+    /// </summary>
+    [DataField]
+    public readonly string AccountId;
 
-    // maybe account id for uniqueness?
+    /// <summary>
+    /// Account nickname
+    /// </summary>
     [DataField]
     public readonly string Name;
+
+    /// <summary>
+    /// Account passwd, leave null for adminbus ones
+    /// </summary>
     [DataField]
-    public readonly string Password;
+    public readonly string? Password;
 
-    /// TODO: flag this OR split enum it: ADMIN_ACCOUNT | (STATION_ACCOUNT | PLAYER_ACCOUNT | COMPANY_ACCOUNT)
-    public readonly bool Private = false;
+    public readonly BankAccountType AccountType;
 
-    // public readonly EntityUid? OwnerRef; // eugh, need a way to ref this to a player when server restarts
+    public readonly string? ParentEntityID;
+
     /// <summary>
     /// id = CurrencyType hash, value = count
     /// </summary>
@@ -80,22 +111,34 @@ public readonly partial struct BankAccount : IEquatable<BankAccount>
 
     public readonly List<BankRecord> BankRecords;
 
-    public BankAccount(string name, string password = "", bool adminbuse = false)
+    public BankAccount(string accountID, string name, string? password = null, BankAccountType accountType = BankAccountType.MagicAccount, string? parent = null)
     {
+        AccountId = accountID;
         Name = name;
         Password = password;
-        Private = adminbuse;
+        AccountType = accountType;
+        ParentEntityID = parent;
         AccountBalance = new Dictionary<int, float>();
         BankRecords = [new BankRecord(CurrencyType.CitadelStationCurrency.GetHashCode(), note: "Account Created")];
     }
 
-    public static bool TransferCurrency(BankAccount from, BankAccount to, int currency, float value, string? note)
+    /// <summary>
+    /// Transfer currency from one account into another
+    /// </summary>
+    /// <param name="from"></param>
+    /// <param name="to"></param>
+    /// <param name="currency"></param>
+    /// <param name="value"></param>
+    /// <param name="note"></param>
+    /// <param name="force">allow the `from` account to go into debt</param>
+    /// <returns>did the transaction complete?</returns>
+    public static bool TransferCurrency(BankAccount from, BankAccount to, int currency, float value, string? note, bool force = false)
     {
-        if (!from.AddCurrency(currency, -value, "Transfer to " + to.Name + " Note:" + note))
+        if (!from.AddCurrency(currency, -value, "Transfer to " + to.Name + " Note:" + note, force))
         {
             return false;
         }
-        from.AddCurrency(currency, value, "Transfer from " + from.Name + " Note:" + note);
+        from.AddCurrency(currency, value, "Transfer from " + from.Name + " Note:" + note, force);
         return true;
     }
 
@@ -106,9 +149,10 @@ public readonly partial struct BankAccount : IEquatable<BankAccount>
     /// <param name="currency">hash of the currency</param>
     /// <param name="value"></param>
     /// <param name="note"></param>
-    public bool AddCurrency(int currency, float value, string note = "")
+    /// <param name="force">allow the account to go into negatives</param>
+    public bool AddCurrency(int currency, float value, string note = "", bool force = false)
     {
-        if (value < 0 && AccountBalance[currency] < Math.Abs(value))
+        if (!force && value < 0 && AccountBalance[currency] < Math.Abs(value))
         {
             // too poor
             return false;
@@ -121,7 +165,7 @@ public readonly partial struct BankAccount : IEquatable<BankAccount>
 
     public bool Equals(BankAccount other)
     {
-        return Name == other.Name && Password == other.Password && Private == other.Private;
+        return AccountId == other.AccountId;
     }
 
     public override bool Equals(object? obj)
@@ -131,7 +175,7 @@ public readonly partial struct BankAccount : IEquatable<BankAccount>
 
     public override int GetHashCode()
     {
-        return HashCode.Combine(Name, Password);
+        return AccountId.GetHashCode();
     }
 }
 

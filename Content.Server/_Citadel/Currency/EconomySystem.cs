@@ -11,24 +11,30 @@ public sealed partial class EconomySystem : SharedEconomySystem
 {
     [Dependency] private StackSystem _stack = default!;
 
-    private readonly List<BankAccount> _bankAccounts = new();
+    private readonly HashSet<BankAccount> _bankAccounts = [];
 
     public override void Initialize()
     {
-        _bankAccounts.Add(BankAccount.StationBankAccount);
-        BankAccount.StationBankAccount.AddCurrency(CurrencyType.CitadelStationCurrency.GetHashCode(), 25_000_000);
-        _bankAccounts.Add(BankAccount.TerraGovAccount);
-        BankAccount.TerraGovAccount.AddCurrency(CurrencyType.CitadelStationCurrency.GetHashCode(), 25_000_000);
-        _bankAccounts.Add(BankAccount.SyndicateAccount);
-        BankAccount.SyndicateAccount.AddCurrency(CurrencyType.SyndicateCurrency.GetHashCode(), 25_000_000);
-        BankAccount.SyndicateAccount.AddCurrency(CurrencyType.CitadelStationCurrency.GetHashCode(), 1_000_000);
+        var stationBankAcc =
+            CreateBankAccount("Citadel Station Accounting", type: BankAccount.BankAccountType.StationAccount);
+        stationBankAcc.AddCurrency(CurrencyType.CitadelStationCurrency.GetHashCode(), 25_000_000);
+
+        var terraGovAccount =
+            CreateBankAccount("TerraGov Finances", type: BankAccount.BankAccountType.FactionAccount);
+        terraGovAccount.AddCurrency(CurrencyType.CitadelStationCurrency.GetHashCode(), 25_000_000);
+
+        var antagAccount =
+            CreateBankAccount("Donk Co. Account C", type: BankAccount.BankAccountType.FactionAccount);
+        antagAccount.AddCurrency(CurrencyType.SyndicateCurrency.GetHashCode(), 25_000_000);
+        antagAccount.AddCurrency(CurrencyType.CitadelStationCurrency.GetHashCode(), 1_000_000);
+
         // TODO saveload things here for bank accounts
         base.Initialize();
     }
 
-    public BankAccount CreateBankAccount(string name, string password, bool adminbuse = false)
+    public BankAccount CreateBankAccount(string name, string? password = null, BankAccount.BankAccountType type = BankAccount.BankAccountType.PlayerAccount, string? parent = null)
     {
-        var bac = new BankAccount(name, password, adminbuse);
+        var bac = new BankAccount(Guid.NewGuid().ToString(), name, password, type, parent);
         _bankAccounts.Add(bac);
         return bac;
     }
@@ -37,13 +43,24 @@ public sealed partial class EconomySystem : SharedEconomySystem
     /// Get bank account
     /// </summary>
     /// <param name="name"></param>
-    /// <param name="password">leave blank for nonstrict lookup (name only)</param>
     /// <returns></returns>
-    public BankAccount? GetBankAccount(string name, string? password)
+    public BankAccount? GetBankAccountByName(string name)
     {
         foreach (var bankAccount in _bankAccounts)
         {
-            if (bankAccount.Name == name && (password == null || bankAccount.Password == password))
+            if (bankAccount.Name == name)
+            {
+                return bankAccount;
+            }
+        }
+        return null;
+    }
+
+    public BankAccount? GetBankAccountByID(string guid)
+    {
+        foreach (var bankAccount in _bankAccounts)
+        {
+            if (bankAccount.AccountId == guid)
             {
                 return bankAccount;
             }
@@ -65,7 +82,7 @@ public sealed partial class EconomySystem : SharedEconomySystem
         string? password,
         string note = "ATM #{MACHINE_ID} Withdrawal")
     {
-        var account = GetBankAccount(name, password);
+        var account = GetBankAccountByName(name);
         if (!account.HasValue)
             return;
         amount = Math.Abs(amount);
