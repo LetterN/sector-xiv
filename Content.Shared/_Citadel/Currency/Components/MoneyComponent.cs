@@ -1,4 +1,5 @@
 using Robust.Shared.GameStates;
+using Robust.Shared.Prototypes;
 
 namespace Content.Shared._Citadel.Currency.Components;
 
@@ -9,10 +10,10 @@ namespace Content.Shared._Citadel.Currency.Components;
 public sealed partial class MoneyComponent : Component
 {
     /// <summary>
-    /// Hash ID of the currency type. we are not storing what actual currency is this here lmao
+    /// id of currency, internal ones are reasonably named, player ones are randomly named
     /// </summary>
-    [DataField, AutoNetworkedField]
-    public int CurrencyType = Currency.CurrencyType.TestStationCurrency.GetHashCode();
+    [DataField(customTypeSerializer: typeof(ProtoId<CurrencyPrototype>)), AutoNetworkedField]
+    public string CurrencyType;
 
     [DataField, AutoNetworkedField]
     public float Amount = 0;

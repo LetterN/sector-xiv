@@ -8,5 +8,14 @@ namespace Content.Shared._Citadel.Currency.Components;
 [RegisterComponent, NetworkedComponent]
 public sealed partial class SharedAtmComponent : Component
 {
+    /// <summary>
+    /// Fluff ID for this atm. Displays on ui and withrawal logs*
+    /// </summary>
+    [DataField] public string AtmId;
 
+    [DataField]
+    public List<string> CurrencyAllowed;
+
+    [DataField]
+    public List<string> CurrencyBlocked;
 }

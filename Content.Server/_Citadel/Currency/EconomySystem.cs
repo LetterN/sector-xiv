@@ -15,24 +15,24 @@ public sealed partial class EconomySystem : SharedEconomySystem
 
     public override void Initialize()
     {
+        base.Initialize();
         var stationBankAcc =
             CreateBankAccount("Citadel Station Accounting", type: BankAccount.BankAccountType.StationAccount);
-        stationBankAcc.AddCurrency(CurrencyType.CitadelStationCurrency.GetHashCode(), 25_000_000);
+        stationBankAcc.AddCurrency("cit_station_money", 25_000_000, note: "Account start");
 
         var terraGovAccount =
             CreateBankAccount("TerraGov Finances", type: BankAccount.BankAccountType.FactionAccount);
-        terraGovAccount.AddCurrency(CurrencyType.CitadelStationCurrency.GetHashCode(), 25_000_000);
+        terraGovAccount.AddCurrency("cit_station_money", 25_000_000, note: "Account start");
 
         var antagAccount =
             CreateBankAccount("Donk Co. Account C", type: BankAccount.BankAccountType.FactionAccount);
-        antagAccount.AddCurrency(CurrencyType.SyndicateCurrency.GetHashCode(), 25_000_000);
-        antagAccount.AddCurrency(CurrencyType.CitadelStationCurrency.GetHashCode(), 1_000_000);
+        antagAccount.AddCurrency("telecrystal", 25_000_000, note: "Account start");
+        antagAccount.AddCurrency("cit_station_money", 1_000_000, note: "Account start");
 
         // TODO saveload things here for bank accounts
-        base.Initialize();
     }
 
-    public BankAccount CreateBankAccount(string name, string? password = null, BankAccount.BankAccountType type = BankAccount.BankAccountType.PlayerAccount, string? parent = null)
+    public BankAccount CreateBankAccount(string name, string? password = null, BankAccount.BankAccountType type = BankAccount.BankAccountType.CharacterAccount, string? parent = null)
     {
         var bac = new BankAccount(Guid.NewGuid().ToString(), name, password, type, parent);
         _bankAccounts.Add(bac);
@@ -76,16 +76,19 @@ public sealed partial class EconomySystem : SharedEconomySystem
     /// <param name="note"></param>
     public void WithrawFromAccount(
         EntityUid atmRef,
-        int currType,
+        string currType,
         float amount,
         string name,
         string? password,
-        string note = "ATM #{MACHINE_ID} Withdrawal")
+        string note = "ATM #%MACHINE_ID% Withdrawal")
     {
+        if (!TryComp<SharedAtmComponent>(atmRef, out var atmCmp))
+            return;
         var account = GetBankAccountByName(name);
         if (!account.HasValue)
             return;
         amount = Math.Abs(amount);
+        note = note.Replace("%MACHINE_ID%", atmCmp.AtmId);
         if (!account.Value.AddCurrency(currType, -amount, note))
             return;
 
